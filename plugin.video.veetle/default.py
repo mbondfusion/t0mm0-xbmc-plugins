@@ -16,11 +16,12 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 '''
 
-import os
+import os,sys
 import simplejson as json
 import time
 import urllib, urllib2
 import xbmc, xbmcaddon, xbmcplugin, xbmcgui
+from operator import itemgetter
 
 pluginUrl = sys.argv[0]
 pluginHandle = int(sys.argv[1])
@@ -115,21 +116,29 @@ if pluginQuery.startswith('?play='):
         dialog = xbmcgui.Dialog()
         ok = dialog.ok(__language__(30000), __language__(30001))   
 
-else:
-    #Load the channel list
+elif pluginQuery.startswith('?folder='):
+    # Load the channel list
     response = urllib2.urlopen(CHANNEL_LISTING)
     channels = json.loads(response.read())
 
-    print 'Total veetle.com Channels: %d' % len(channels)
+    print('Total veetle.com Channels: %d' % len(channels))
 
-    #only list channels we can stream
-    channels = [channel for channel in channels if channel.get('flashEnabled', 
-                                                               False)]
-                                                               
-    print 'Flash Enabled veetle.com Channels: %d' % len(channels)
+    # Filter on selected folder and Flash only
+    folder_id = pluginQuery[8:].strip()
+    print('Selected folder: %s' % folder_id)
+
+    channels = [channel for channel in channels
+        if channel.get('flashEnabled', False) and
+        channel.get('categoryId', '') == folder_id]
+    
+    print('Filtered veetle.com Channels: %d' % len(channels))
+
+    # Sort channels by title
+    # TODO: Use XBMC sort functionality
+    channels_sorted = sorted(channels, key=itemgetter('title'))
 
     do_grab = False #__settings__.getSetting('grab_schedule')
-    for channel in channels:
+    for channel in channels_sorted:
         url = pluginUrl + '?play=' + channel['channelId']
         sm = channel['logo'].get('sm', '')
         lg = channel['logo'].get('lg', '')
@@ -153,6 +162,32 @@ else:
         listitem.setInfo('video', infoLabels)
         listitem.setProperty('IsPlayable', 'true')
         xbmcplugin.addDirectoryItem(pluginHandle, url, listitem, 
-                                    isFolder=False, totalItems=len(channels))
-    xbmcplugin.endOfDirectory(pluginHandle)
+                                    isFolder=False,
+                                    totalItems=len(channels_sorted))
+    xbmcplugin.endOfDirectory(pluginHandle, succeeded=True)
 
+else:
+    # Channel Categories
+    # TODO: load these dynamically from veetle.com -> they change)
+    categories = { 60: 'Animation',
+                   50: 'Comedy',
+                   90: 'Education',
+                   40: 'Gaming',
+                   110: 'Mobile',
+                   10: 'Entertainment',
+                   20: 'Shows',
+                   80: 'Sports',
+                   70: 'Music',
+                   30: 'News',
+                   100: 'Religion' }
+
+    # List the channel categories by default
+    print('Listing Veetle Categories')
+    for category in sorted(categories, key=categories.get):
+        listitem = xbmcgui.ListItem(categories[category])
+        xbmcplugin.addDirectoryItem(pluginHandle,
+                                    pluginUrl + '?folder=' + str(category),
+                                    listitem,
+                                    isFolder=True)
+
+    xbmcplugin.endOfDirectory(pluginHandle, succeeded=True)

@@ -1,4 +1,7 @@
 [B]Version 0.1.6[/B]
+- Updated to enabled channel navigation by category
+
+[B]Version 0.1.6[/B]
 - fix breakage due to site changes
 
 [B]Version 0.1.5[/B]
